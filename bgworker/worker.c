@@ -33,6 +33,7 @@
 #include "tcop/utility.h"
 
  /* Our own include files */
+ #include "worker.h"
 #include "commons.h"
 #include "jobs.h"
 
@@ -84,21 +85,27 @@ static void
 initialize_worker(uint32 segment)
 {
 	dsm_segment   *seg;
+	ResourceOwner old,
+				  tmp;
 	/* Connect to dynamic shared memory segment.
 	 *
 	 * In order to attach a dynamic shared memory segment, we need a
-	 * resource owner.
+	 * resource owner. We cannot to StartTransactionCommand here, since
+	 * we haven't yet attached to the database: to do this, we need to
+	 * fetch information about connection properties from the shared
+	 * memory segment.
 	 */
-/*	 CurrentResourceOwner = ResourceOwnerCreate(NULL, PROCESS_NAME);*/
-
+	 old = CurrentResourceOwner;
+	 CurrentResourceOwner = ResourceOwnerCreate(NULL, "Background Worker");
 	 seg = dsm_attach(segment);
 	 if (seg == NULL)
 	 	ereport(ERROR,
 	 			(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 	 			 errmsg("unable to map dynamic shared memory segment")));
-
-	 job_run_function.schema = quote_identifier(job->schemaname);
-	 job_run_function.name = quote_identifier("run_job");
+	 dsm_pin_mapping(seg);
+	 tmp = CurrentResourceOwner;
+	 CurrentResourceOwner = old;
+	 ResourceOwnerDelete(tmp);
 
 	 job = palloc(sizeof(JobDesc));
 	 /* copy the arguments from shared memory segment */
@@ -106,7 +113,10 @@ initialize_worker(uint32 segment)
 
 	 /* and detach it right away */
 	 dsm_detach(seg);
+	 Assert(job->magic == JOB_MAGIC);
 
+	 job_run_function.schema = quote_identifier(job->schemaname);
+	 job_run_function.name = quote_identifier("run_job");
 }
 
 void worker_main(Datum arg)

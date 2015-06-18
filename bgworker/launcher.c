@@ -40,7 +40,6 @@
 #define PROCESS_NAME "elephant launcher"
 
 PG_MODULE_MAGIC;
-PG_FUNCTION_INFO_V1(launcher_main);
 
 void _PG_init(void);
 
@@ -49,9 +48,9 @@ static volatile sig_atomic_t got_sighup = false;
 static volatile sig_atomic_t got_sigterm = false;
 static volatile sig_atomic_t got_sigusr1 = false;
 
-static uint32 	launcher_naptime = 500;
+static int 	launcher_naptime = 500;
 
-extern uint32 	launcher_max_workers = 10;
+static int 	launcher_max_workers = 10;
 static char 	*launcher_database = NULL;
 
 typedef struct worker_state
@@ -139,22 +138,19 @@ launcher_sigterm(SIGNAL_ARGS)
 static void
 init_launcher()
 {
-	int 	i;
-
 	/* allocate the workers state in the global context */
 	wstate = palloc0(sizeof(worker_state) * launcher_max_workers);
-	/*CurrentResourceOwner = ResourceOwnerCreate(NULL, PROCESS_NAME);*/
 	pgstat_report_activity(STATE_RUNNING, "launcher initialization");
 }
 
-static char *
+static void
 launcher_get_extension_schema(char *extname)
 {
 	StringInfoData 	buf;
 	char 		   *tmp;
 
 	if (!extname)
-		return NULL;
+		return;
 
 
 	initStringInfo(&buf);
@@ -177,7 +173,7 @@ launcher_get_extension_schema(char *extname)
 		elog(FATAL, "could not query system catalogs for extension %s", EXTENSION_NAME);
 	tmp = SPI_getvalue(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1);
 	if (!tmp)
-		elog(FATAL, "%s returned NULL result");
+		elog(FATAL, "%s returned NULL result", buf.data);
 	strncpy(schema_name, tmp, NAMEDATALEN);
 
 	/* finish the SPI query */
@@ -203,7 +199,7 @@ init_table_names()
 	schedule_function.schema = quote_identifier(schema_name);
 }
 
-bool check_worker_alive(int i)
+static bool check_worker_alive(int i)
 {
 	pid_t 	pid;
 
@@ -273,9 +269,17 @@ launch_worker(int index, JobDesc *job_desc)
 			 }
 		}
 	}
-	/* copy the job information to shared memory */
+	/*
+	   Create a new shared memory segment. We have to do it inside a transaction
+	   to have a resourceowner, and then pin it to avoid removing it when the
+	   transaction commits.
+	 */
+	StartTransactionCommand();
 	segment = dsm_create(sizeof(JobDesc));
+	dsm_pin_mapping(segment);
+	CommitTransactionCommand();
 
+	/* copy the job information to shared memory */
 	memcpy(dsm_segment_address(segment), job_desc, sizeof(JobDesc));
 	/* prepare the information to actually launch the worker */
 	worker.bgw_flags = BGWORKER_SHMEM_ACCESS | BGWORKER_BACKEND_DATABASE_CONNECTION;
@@ -370,7 +374,6 @@ static void run_scheduled_jobs()
 		elog(FATAL, "cannot obtain list of jobs to run");
 
 	/* Get the oids of jobs to run */
-	elog(LOG, "fetching attributes");
 	for (i = 0; i < SPI_processed; i++)
 	{
 		char   *datname;
@@ -388,10 +391,10 @@ static void run_scheduled_jobs()
 		Assert(!isnull);
 
 		datname = get_text_via_spi(SPI_tuptable, i, "datname");
-		Assert(len(datname) > 0);
+		Assert(strlen(datname) > 0);
 
 		rolname = get_text_via_spi(SPI_tuptable, i, "rolname");
-		Assert(len(rolname) > 0);
+		Assert(strlen(rolname) > 0);
 
 		parallel = DatumGetBool(get_attribute_via_spi(SPI_tuptable, i, "parallel", &isnull));
 		Assert(!isnull);
@@ -433,14 +436,20 @@ static void run_scheduled_jobs()
 				break;
 			}
 		}
-		elog(WARNING, "unable to launch more job: all available worker slots are occupied",
-					  (errhint("Increase the elephant_worker.max_worker value")));
-		break;
+		if (i == launcher_max_workers + 1)
+		{
+			ereport(WARNING,
+			(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
+					 errmsg("unable to launch more job: all available worker slots are occupied"),
+				     errhint("Increase the elephant_worker.max_worker value.")));
+			break;
+		}
 	}
 	list_free_deep(scheduled_jobs);
 }
 
-Datum launcher_main(PG_FUNCTION_ARGS)
+static void
+launcher_main(Datum arg)
 {
 	/* Setup signal handlers */
 	pqsignal(SIGHUP, launcher_sighup);
@@ -459,7 +468,6 @@ Datum launcher_main(PG_FUNCTION_ARGS)
 	/* loop until SIGTERM will command us to exit */
 	while (!got_sigterm)
 	{
-		int 	ret;
 		int 	rc;
 
 		/*

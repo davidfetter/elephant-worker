@@ -11,11 +11,13 @@
 #define _COMMONS_H
 
 #define EXTENSION_NAME  "elephant_worker"
+#define JOB_MAGIC 18062015
 
  typedef struct db_object_data
  {
- 	char   *schema;
- 	char   *name;
+ 	uint32 magic;
+ 	const char   *schema;
+ 	const char   *name;
  } db_object_data;
 
 #endif /* _JOBS_H */

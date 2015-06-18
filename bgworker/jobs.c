@@ -19,6 +19,7 @@ fill_job_description(JobDesc *desc,
 					 char *schema, bool parallel,
 					 uint32 timeout)
 {
+	desc->magic = JOB_MAGIC;
 	desc->job_id = id;
 	desc->job_log_id = log_id;
 	desc->job_timeout = timeout;

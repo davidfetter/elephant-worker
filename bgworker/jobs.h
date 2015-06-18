@@ -12,8 +12,11 @@
 
 #include "postgres.h"
 
+#define JOB_MAGIC 18062015
+
 typedef struct JobDesc
 {
+	uint32 magic;
 	uint32 	job_id;
 	uint32	job_log_id;
 	uint32 	job_timeout;

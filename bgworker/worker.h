@@ -12,5 +12,5 @@
 
  #include 	"postgres.h"
 
- void		worker__main(Datum) __attribute__((noreturn));
+ void		worker_main(Datum) __attribute__((noreturn));
  #endif
