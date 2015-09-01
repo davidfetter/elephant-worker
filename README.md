@@ -1,3 +1,8 @@
+Warning
+===========
+
+This process is not finished and is still in the development/experimental stage (so to say, very early alpha). Do not use it in production without careful evaluation. We, of course, accept bug reports and patches. 
+
 Introduction
 ============
 Among those new features of PostgreSQL 9.4 there is support for dynamic background workers. These autovacuum-like processes can do everything a normal backend can. Those are launched by PostgreSQL itself and can perform any actions programmed by the user, from simple, like killing idle transactions, to as complex as predicting column values or collecting data for DB monitoring . In PostgreSQL 9.4 they can also start additional background processes.
