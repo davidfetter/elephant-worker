@@ -36,9 +36,14 @@ To install this extension you need to install the extension files first.
 
 To load the extension in the database do:
 
-	psql=> CREATE EXTENSION elephant_worker [WITH SCHEMA scheduler];
 	psql=> GRANT job_scheduler TO very_important_application;
+	psql=> CREATE EXTENSION elephant_worker [WITH SCHEMA scheduler];
 
+Afterwards, in postgresql.conf, set
+
+	elephant_worker.database = 'your_db_with_extension'
+
+and restart PostgreSQL
 
 Usage
 =====
