@@ -1,7 +1,7 @@
 Warning
 ===========
 
-This process is not finished and is still in the development/experimental stage (so to say, very early alpha). Do not use it in production without careful evaluation. We, of course, accept bug reports and patches. 
+This program is not finished and is still in the development/experimental stage (early alpha). Do not use it in production without careful evaluation. We, of course, accept bug reports and patches. 
 
 Introduction
 ============
