@@ -31,7 +31,7 @@ To install this extension you need to install the extension files first.
 
 To load the extension in the database do:
 
-	psql=> CREATE EXTENSION elephant_scheduler [WITH SCHEMA scheduler];
+	psql=> CREATE EXTENSION elephant_worker [WITH SCHEMA scheduler];
 	psql=> GRANT job_scheduler TO very_important_application;
 
 
