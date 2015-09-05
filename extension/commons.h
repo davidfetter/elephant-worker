@@ -20,4 +20,4 @@
  	const char   *name;
  } db_object_data;
 
-#endif /* _JOBS_H */
+#endif /* _COMMONS_H */
