@@ -52,6 +52,12 @@ BEGIN
             FOREACH cronfield_entry IN ARRAY string_to_array(entries[i], ',')
             LOOP
                 cronfield_entry_groups := regexp_matches(cronfield_entry, cronfield_entry_regexp);
+                IF cronfield_entry_groups IS NULL THEN
+                    RAISE SQLSTATE '22023' USING
+                        MESSAGE = 'Invalid crontab parameter.',
+                        DETAIL  = format('Could not parse crontab entry: %s', cronfield_entry);
+                END IF;
+
                 min := cronfield_entry_groups[2];
                 step := coalesce(cronfield_entry_groups[6]::int,1);
                 IF cronfield_entry_groups[1] = '*' THEN
@@ -64,7 +70,7 @@ BEGIN
                 IF max < min OR max > maxvalue OR min < minvalue THEN
                     RAISE SQLSTATE '22023' USING
                         MESSAGE = 'Invalid crontab parameter.',
-                        DETAIL  = format('Range start: %s (%s), End range: %s (%s), Step: %s for crontab field: %s', min, minvalue, max, maxvalue, step, cronfield),
+                        DETAIL  = format('Range start: %s (%s), End range: %s (%s), Step: %s for crontab field: %s', min, minvalue, max, maxvalue, step, cronfield_entry),
                         HINT    = 'Ensure range is ascending and that the ranges is within allowed bounds';
                 END IF;
 
