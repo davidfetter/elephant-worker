@@ -111,7 +111,7 @@ launcher_sigusr1(SIGNAL_ARGS)
 
 	got_sigusr1 = true;
 
-	if (set_latch_on_sigusr1 && MyProc != NULL)
+	if (MyProc != NULL)
 		SetLatch(&MyProc->procLatch);
 
 	errno = save_errno;
@@ -275,7 +275,7 @@ launch_worker(int index, JobDesc *job_desc)
 	   transaction commits.
 	 */
 	StartTransactionCommand();
-	segment = dsm_create(sizeof(JobDesc));
+	segment = dsm_create(sizeof(JobDesc),0);
 	dsm_pin_mapping(segment);
 	CommitTransactionCommand();
 
